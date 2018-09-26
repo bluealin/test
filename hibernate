@@ -1,0 +1,119 @@
+hibernate
+配置文件可以生成数据库表
+且能定义表之间的关系    外键   一对一 一对多  多对一
+
+多对多 借助 中间表。
+
+中间表的映射文件   部门和用户的中间表
+<hibernate-mapping>
+<class  name table=‘dep’>  类名和数据库表对应
+表属性  
+多对多
+<set name=''  table="第三个表的  中间表">  中间表两个表
+<key column="roleid"  >外键是岗位表
+《many-to-many class="user" column="userid"》  用户表的外键
+
+
+
+部门映射文件
+子部门和上级部门
+id  name  descri  parentId 
+多对一
+
+<many-to-one name=“实体parent” class=“”    column="表外键"》
+
+上级部门和子部门  一对多关系
+
+<set name="实体属性children"  >
+<key  column="parentId"/>
+<one-to-many class="">
+
+两个表的一对多  部门与用户
+
+<set name=“users”>
+<key column=" departID">
+<one to many class="user" >
+
+-----------------
+岗位表配置文件
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC 
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
+<hibernate-mapping>
+	<class name="cn.itcast.oa.domain.Role" table="itcast_role">
+		<id name="id">
+			<generator class="native"/>
+		</id>
+		<property name="name" length="32"/>
+		<property name="description" length="128"/>
+		
+		<!-- 岗位和用户的多对多关系 --> //需要借助第三个表itcast_user_role 
+		<set name="" table="itcast_user_role">
+			<key column="roleId"/>     ///岗位表的主键作为外键【岗位表的主键作为关联表的外键，名为roleid】
+			<many-to-many class="cn.itcast.oa.domain.User" column="userId"/>  //用户表的主键作为外键【用户表的主键作为关联表的外键 叫userid】
+		</set>
+	</class>
+</hibernate-mapping>
+
+
+
+部门表
+---------------
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC 
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
+<hibernate-mapping>
+	<class name="cn.itcast.oa.domain.Department" table="itcast_department">
+		<id name="id">
+			<generator class="native"/>
+		</id>
+		<property name="name" length="32"/>
+		<property name="description" length="128"/>
+		
+		<!-- 子部门和上级部门的多对一关系 -->//parent类的属性 表的属性 parentId【Department的主键作为depart的外键存在 名 parentId】
+		<many-to-one name="parent" class="cn.itcast.oa.domain.Department" column="parentId"/>
+		
+		<!-- 上级部门和子部门之间的一对多关系 -->  
+		<set name="children" cascade="delete">
+			<key column="parentId"/>   //类的children属性和部门表的 parentid对应，外键是parentId【部门表的主键作为部门表的外键 键 的名称是parentid】
+			<one-to-many class="cn.itcast.oa.domain.Department"/>
+		</set>
+		
+		<!-- 部门和用户的一对多关系 -->
+		<set name="users">
+			<key column="departmentId"/>  //用户表的departmentid作为部门表的外键（部门表的主键作为用户表的外键（depid），名称是departmentid）
+			<one-to-many class="cn.itcast.oa.domain.User"/>
+		</set>
+	</class>
+</hibernate-mapping>
+用户表
+---------
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC 
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
+<hibernate-mapping>
+	<class name="cn.itcast.oa.domain.User" table="itcast_user">
+		<id name="id">
+			<generator class="native"/>
+		</id>
+		<property name="loginName" length="32"/>
+		<property name="name"></property>
+		<property name="password"></property>
+		<property name="phone"></property>
+		<property name="email"></property>
+		<property name="gender"></property>
+		<property name="description"></property>
+		
+		<!-- 用户和部门的多对一关系 -->
+		<many-to-one name="department" class="cn.itcast.oa.domain.Department" column="departmentId"/>   //【部门表的主键作为用户表的外键departmenid存在】
+		
+		<!-- 用户和岗位的多对多关系 -->
+		<set name="roles" table="itcast_user_role">
+			<key column="userId"/>    // 【用户表的主键 作为关联表的外键roleid】
+			<many-to-many class="cn.itcast.oa.domain.Role" column="roleId"/>  //[岗位表的主键作为关联表的外键 roleid
+		</set>
+	</class>
+</hibernate-mapping>
