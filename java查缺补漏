@@ -1,0 +1,326 @@
+Struts 过滤器
+
+每一个Action请求都包装在一系列的拦截器的内部。拦截器可以在Action执行之前做相似的操作也可以在Action执行直后做回收操作。
+每一个Action既可以将操作转交给下面的拦截器，Action也可以直接退出操作返回客户既定的画面。
+
+如何自定义一个拦截器？
+
+自定义一个拦截器需要三步：
+
+1 自定义一个实现Interceptor接口（或者继承自AbstractInterceptor）的类。
+
+2 在strutx.xml中注册上一步中定义的拦截器。
+
+3 在需要使用的Action中引用上述定义的拦截器，为了方便也可将拦截器定义为默认的拦截器，这样在不加特殊声明的情况下所有的Action都被这个拦截器拦截。
+
+Interceptor接口声明了三个方法：
+
+复制代码
+public interface Interceptor extends Serializable {
+ 
+    void destroy();
+ 
+    void init();
+ 
+    String intercept(ActionInvocation invocation) throws Exception;
+}
+Init方法在拦截器类被创建之后，在对Action镜像拦截之前调用，相当于一个post-constructor方法，使用这个方法可以给拦截器类做必要的初始话操作。 
+
+Destroy方法在拦截器被垃圾回收之前调用，用来回收init方法初始化的资源。 
+
+Intercept是拦截器的主要拦截方法，如果需要调用后续的Action或者拦截器，只需要在该方法中调用invocation.invoke()方法即可，在该方法调用的前后可以插入Action调用前后拦截器需要做的方法。如果不需要调用后续的方法，则返回一个String类型的对象即可，例如Action.SUCCESS。
+
+另外AbstractInterceptor提供了一个简单的Interceptor的实现，这个实现为
+
+public abstract class AbstractInterceptor implements Interceptor {
+ 
+     public void init() {
+    }
+   
+    public void destroy() {
+    }
+ 
+ 
+    public abstract String intercept(ActionInvocation invocation) throws Exception;
+}
+在不需要编写init和destroy方法的时候，只需要从AbstractInterceptor继承而来，实现intercept方法即可。
+
+我们尝试编写一个Session过滤用的拦截器，该拦截器查看用户Session中是否存在特定的属性（LOGIN属性）如果不存在，中止后续操作定位到LOGIN，否则执行原定操作，代码为：
+
+public class CheckLoginInterceptor extends AbstractInterceptor {
+    public static final String LOGIN_KEY = "LOGIN";
+    public static final String LOGIN_PAGE = "global.login";
+ 
+    public String intercept(ActionInvocation actionInvocation) throws Exception {
+ 
+        System.out.println("begin check login interceptor!");
+        // 对LoginAction不做该项拦截
+        Object action = actionInvocation.getAction();
+        if (action instanceof LoginAction) {
+            System.out.println("exit check login, because this is login action.");
+            return actionInvocation.invoke();
+        }
+ 
+        // 确认Session中是否存在LOGIN
+        Map session = actionInvocation.getInvocationContext().getSession();
+        String login = (String) session.get(LOGIN_KEY);
+        if (login != null && login.length() > 0) {
+            // 存在的情况下进行后续操作。
+            System.out.println("already login!");
+            return actionInvocation.invoke();
+        } else {
+            // 否则终止后续操作，返回LOGIN
+            System.out.println("no login, forward login page!");
+            return LOGIN_PAGE;
+        }
+    }
+}
+ 
+注册拦截器
+<interceptors>
+            <interceptor
+name="login" 
+class="com.jpleasure.teamware.util.CheckLoginInterceptor"/>
+            <interceptor-stack name="teamwareStack">
+                <interceptor-ref name="login"/>
+                <interceptor-ref name="defaultStack"/>
+            </interceptor-stack>
+</interceptors>
+ 
+将上述拦截器设定为默认拦截器：
+<default-interceptor-ref name="teamwareStack"/>
+这样在后续同一个package内部的所有Action执行之前都会被login拦截。
+-------------
+拦截器   拦截器堆栈
+
+注册并引用Interceptor
+<package name="default" extends="struts-default">
+   <interceptors>
+       <interceptor name="timer" class=".."/>
+       <interceptor name="logger" class=".."/>
+   </interceptors>
+ 
+   <action name="login" class="tutorial.Login">
+        <interceptor-ref name="timer"/>
+        <interceptor-ref name="logger"/>
+        <result name="input">login.jsp</result>
+        <result name="success"
+            type="redirect-action">/secure/home</result>
+   </action>
+</package>
+ 
+可以将多个拦截器合并在一起作为一个堆栈调用，当一个拦截器堆栈被附加到一个Action的时候，要想Action执行，必须执行拦截器堆栈中的每一个拦截器。
+<package name="default" extends="struts-default">
+   <interceptors>
+        <interceptor name="timer" class=".."/>
+        <interceptor name="logger" class=".."/>
+        <interceptor-stack name="myStack">
+           <interceptor-ref name="timer"/>
+           <interceptor-ref name="logger"/>
+        </interceptor-stack>
+    </interceptors>
+ 
+    <action name="login" class="tutuorial.Login">
+         <interceptor-ref name="myStack"/>
+         <result name="input">login.jsp</result>
+         <result name="success"
+             type="redirect-action">/secure/home</result>
+    </action>
+</package>
+ 
+上述说明的拦截器在默认的Struts2应用中，根据惯例配置了若干个拦截器堆栈，详细情参看struts-default.xml
+其中有一个拦截器堆栈比较特殊，他会应用在默认的每一个Action上。
+<interceptor-stack name="defaultStack">
+    <interceptor-ref name="exception"/>
+    <interceptor-ref name="alias"/>
+    <interceptor-ref name="servletConfig"/>
+    <interceptor-ref name="prepare"/>
+    <interceptor-ref name="i18n"/>
+    <interceptor-ref name="chain"/>
+    <interceptor-ref name="debugging"/>
+    <interceptor-ref name="profiling"/>
+    <interceptor-ref name="scopedModelDriven"/>
+    <interceptor-ref name="modelDriven"/>
+    <interceptor-ref name="fileUpload"/>
+    <interceptor-ref name="checkbox"/>
+    <interceptor-ref name="staticParams"/>
+    <interceptor-ref name="params">
+      <param name="excludeParams">dojo"..*</param>
+    </interceptor-ref>
+    <interceptor-ref name="conversionError"/>
+    <interceptor-ref name="validation">
+        <param name="excludeMethods">input,back,cancel,browse</param>
+    </interceptor-ref>
+    <interceptor-ref name="workflow">
+        <param name="excludeMethods">input,back,cancel,browse</param>
+    </interceptor-ref>
+</interceptor-stack>
+ 
+每一个拦截器都可以配置参数，有两种方式配置参数，一是针对每一个拦截器定义参数，二是针对一个拦截器堆栈统一定义所有的参数，例如：
+<interceptor-ref name="validation">
+ <param name="excludeMethods">myValidationExcudeMethod</param>
+</interceptor-ref>
+<interceptor-ref name="workflow">
+ <param name="excludeMethods">myWorkflowExcludeMethod</param>
+</interceptor-ref>
+或者
+<interceptor-ref name="defaultStack">
+    <param name="validation.excludeMethods">myValidationExcludeMethod</param>
+    <param name="workflow.excludeMethods">myWorkflowExcludeMethod</param>
+</interceptor-ref>
+ 
+每一个拦截器都有两个默认的参数：
+excludeMethods - 过滤掉不使用拦截器的方法和
+includeMethods – 使用拦截器的方法。
+ 
+需要说明的几点：
+1 拦截器执行的顺序按照定义的顺序执行，例如：
+<interceptor-stack name="xaStack">
+ <interceptor-ref name="thisWillRunFirstInterceptor"/>
+ <interceptor-ref name="thisWillRunNextInterceptor"/>
+ <interceptor-ref name="followedByThisInterceptor"/>
+ <interceptor-ref name="thisWillRunLastInterceptor"/>
+</interceptor-stack>
+的执行顺序为：
+thisWillRunFirstInterceptor
+ thisWillRunNextInterceptor
+    followedByThisInterceptor
+      thisWillRunLastInterceptor
+        MyAction1
+        MyAction2 (chain)
+        MyPreResultListener
+        MyResult (result)
+      thisWillRunLastInterceptor
+    followedByThisInterceptor
+ thisWillRunNextInterceptor
+thisWillRunFirstInterceptor
+ 
+2 使用默认拦截器配置每个Action都需要的拦截器堆栈，例如：
+<action name="login" class="tutorial.Login">
+     <interceptor-ref name="timer"/>
+     <interceptor-ref name="logger"/>
+     <interceptor-ref name="default-stack"/>
+ 
+     <result name="input">login.jsp</result>
+     <result type="redirect-action">/secure/home</result>
+</action>
+可以按照如下的方式定义：
+<interceptors>
+     <interceptor-stack name="myStack">
+        <interceptor-ref name="timer"/>
+        <interceptor-ref name="logger"/>
+        <interceptor-ref name="default-stack"/>
+     </interceptor-stack>
+</interceptors>
+ 
+<default-interceptor-ref name="myStack"/>
+ 
+<action name="login" class="tutorial.Login">
+       <result name="input">login.jsp</result>
+       <result type="redirect-action">/secure/home</result>
+</action>
+ 
+3 如何访问HttpServletRequest，HttpServletResponse或者HttpSession
+有两种方法可以达到效果，使用ActionContext：
+Map attibutes = ActionContext.getContext().getSession();
+或者实现相应的接口：
+HttpSession            SessionAware
+HttpServletRequest     ServletRequestAware
+HttpServletResponse    ServletResponseAware
+
+
+Struts2自定义拦截器实例—只允许从登录页面进入系统
+【1】struts.xml:
+ <!-- 定义一个拦截器 -->  
+        <interceptors>  
+            <interceptor name="authority"  
+                class="org.interceptot.LoginInterceptor">  
+            </interceptor>  
+            
+            <!-- 拦截器栈 -->  
+            <interceptor-stack name="mydefault">  
+                <interceptor-ref name="defaultStack" />  
+                <interceptor-ref name="authority" />  
+            </interceptor-stack>  
+        </interceptors>
+        
+         
+        
+         <!-- 定义全局Result -->  
+        <global-results>  
+            <!-- 当返回login视图名时，转入/login.jsp页面 -->  
+            <result name="login">/login.jsp</result>  
+        </global-results>
+        
+        
+        <action name="show" class="org.action.showAction">  
+            <result name="success">/main.jsp</result>  
+            <!-- 使用此拦截器 -->  
+            <interceptor-ref name="mydefault" />  
+        </action>  
+        
+        
+        <!--验证登录用户信息  -->
+        <action name="login" class="org.action.loginAction" method="execute">
+            <result name="error">/login.jsp</result>  
+            <result name="input">/login.jsp</result> 
+        </action>
+       
+【2】自定义拦截器org.interceptot.LoginInterceptor：
+package org.interceptot;
+import java.util.Map;  
+
+import com.opensymphony.xwork2.Action;  
+import com.opensymphony.xwork2.ActionContext;  
+import com.opensymphony.xwork2.ActionInvocation;  
+import com.opensymphony.xwork2.interceptor.AbstractInterceptor;  
+public class LoginInterceptor extends AbstractInterceptor {  
+ 
+    @Override  
+    public String intercept(ActionInvocation invocation) throws Exception {  
+  
+        // 取得请求相关的ActionContext实例  
+        ActionContext ctx = invocation.getInvocationContext();  
+        Map session = ctx.getSession();  
+        String user = (String) session.get("username");  
+  
+        // 如果没有登陆，即用户名不存在，都返回重新登陆  
+        System.out.println("user:"+user);
+        if (user != null) {  
+            System.out.println("test");  
+            return invocation.invoke();  
+        }  
+        System.out.println("你还没有登录"); 
+        ctx.put("tip", "你还没有登录");  
+        return Action.LOGIN;    //返回一个叫login的result结果
+  
+    }  
+  
+}  
+【3】进入主页面的Action：org.action.showAction
+package org.action;
+
+import com.opensymphony.xwork2.ActionSupport;  
+
+public class showAction extends ActionSupport {  
+ public String execute() {  
+  return "success";  
+ }  
+}  
+
+【4】LoginAction:
+
+private boolean isInvalid(String value) {     
+return (value == null || value.length() == 0);     
+}  
+if (isInvalid(user.getUsername()))   
+       return INPUT;     
+ if (isInvalid(user.getPassword()))     
+       return INPUT;    
+ //登录成功将User放入session中
+HttpServletRequest request = ServletActionContext.getRequest();
+Map  map=ActionContext.getContext().getSession();
+map.put("username", user.getUsername());
+
+【5】如果我们通过show.action访问main.jsp那么就会被自定义拦截器拦住，拦截器检查session中
+是否有值，有证明用户已经登录，没有则为没有登录，那么就会被跳转到登陆页面。
