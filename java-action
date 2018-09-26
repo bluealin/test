@@ -5,4 +5,4 @@
 
 通过路径可以找到namespace下的  action类{{1}Action}   找到对应类中的方法{2}
 
-
+struts 的result 的name对应action类中方法 return name；
