@@ -1,0 +1,122 @@
+•使用 Hibernate 进行数据持久化操作，通常有如下步骤：
+
+–编写持久化类： POJO + 映射文件
+
+–获取 Configuration 对象
+
+–获取 SessionFactory 对象
+
+–获取 Session，打开事务
+
+–用面向对象的方式操作数据库
+
+–关闭事务，关闭 Session
+
+//1.創建sessionfactory
+		SessionFactory sessionFactory = null;
+		Configuration configuration = new Configuration().configure();
+		//3.0前
+		//sessionFactory = configuration.buildSessionFactory();
+		ServiceRegistry serviceRegistry = new ServiceRegistryBuilder().applySettings(configuration.getProperties())
+				.buildServiceRegistry();
+		sessionFactory = configuration.buildSessionFactory(serviceRegistry);
+		//2.session
+		Session session = sessionFactory.openSession();
+		//3.open transaction
+		Transaction transaction = session.beginTransaction();
+		//4.save data
+		User user = new User("liyanlin","liyanlin520");
+		
+		
+		//保存到数据库
+		//session.save(user);
+		//从数据库获取一个数据吧
+		User user2 = (User) session.get(User.class, 1);
+		System.out.println(user2);
+		
+		//5.commite transaction
+		transaction.commit();
+1.Configuration类：
+
+•Configuration 类负责管理 Hibernate 的配置信息。包括如下内容：
+
+            –Hibernate 运行的底层信息：数据库的URL、用户名、密码、JDBC驱动类，数据库Dialect,数据库连接池等（对应 hibernate.cfg.xml 文件）。
+
+            –持久化类与数据表的映射关系（*.hbm.xml 文件）
+
+•创建 Configuration 的两种方式
+
+            –属性文件（hibernate.properties）:
+
+•Configuration cfg = new Configuration();
+
+            –Xml文件（hibernate.cfg.xml）
+
+•Configuration cfg = new Configuration().configure();
+
+            –Configuration 的 configure 方法还支持带参数的访问：
+
+•File file = new File(“simpleit.xml”);
+
+•Configuration cfg = new Configuration().configure(file);
+
+  
+
+2.SessionFactory 接口
+
+•针对单个数据库映射关系经过编译后的内存镜像，是线程安全的。
+
+•SessionFactory 对象一旦构造完毕，即被赋予特定的配置信息
+
+•SessionFactory是生成Session的工厂
+
+•构造 SessionFactory 很消耗资源，一般情况下一个应用中只初始化一个 SessionFactory 对象。
+
+•Hibernate4 新增了一个 ServiceRegistry 接口，所有基于 Hibernate 的配置或者服务都必须统一向这个 ServiceRegistry  注册后才能生效
+
+•Hibernate4 中创建 SessionFactory 的步骤
+
+多了一步注册对象的创建
+
+  cfg   serviceRegistry   sessionfactory
+  
+  3.session接口：
+
+Session 是应用程序与数据库之间交互操作的一个单线程对象，是 Hibernate 运作的中心，所有持久化对象必须在 session 的管理下才可以进行持久化操作。此对象的生命周期很短。Session 对象有一个一级缓存，显式执行 flush 之前，所有的持久层操作的数据都缓存在 session 对象处。相当于 JDBC 中的 Connection。
+
+ 
+
+•持久化类与 Session 关联起来后就具有了持久化的能力。
+
+•Session 类的方法：
+
+–取得持久化对象的方法： get() load()
+
+–持久化对象都得保存，更新和删除：save(),update(),saveOrUpdate(),delete()
+
+–开启事务: beginTransaction().
+
+–管理 Session 的方法：isOpen(),flush(), clear(), evict(), close()等
+
+ 
+
+4.事务Transaction:
+
+•代表一次原子操作，它具有数据库事务的概念。所有持久层都应该在事务管理下进行，即使是只读操作。
+
+  Transaction tx = session.beginTransaction();
+
+•常用方法:
+
+–commit():提交相关联的session实例
+
+–rollback():撤销事务操作
+
+–wasCommitted():检查事务是否提交
+
+ 
+
+这上面的方式其实还是挺繁琐的，要是用hibernate还需要注册服务各种操作，但是幸运的是已经不再自己写sql语句了，[通常情况下]也不需要自己去处理各种sql报错的异常了。
+
+其实，使用spring中的HibernateDaoSupport类，可以更加方便地搞：
+
