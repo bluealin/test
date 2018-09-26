@@ -1,0 +1,8 @@
+<form action="/emp-employee-add" method="post">   path请求   namespace/name    namespace/emp-employee-add  :employee对应{1}  add{2}
+
+<action name="emp-*-*" class="{1}Action" method="{2}">
+
+
+通过路径可以找到namespace下的  action类{{1}Action}   找到对应类中的方法{2}
+
+
